@@ -1,3 +1,8 @@
+#---------------------------------------------------------------------------------------------------------------
+#PLEASE NOTE - I did not create this file, it was given for me to use while completing my project,
+#              as it was imported for us in my own code, I would like to give appropriate credit where it is due
+#---------------------------------------------------------------------------------------------------------------
+
 ################################################################################
 # Max Falkenberg McGillivray
 # mff113@ic.ac.uk
