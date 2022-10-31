@@ -1,0 +1,167 @@
+
+import numpy as np
+import random as ran
+import matplotlib.pyplot as plt
+import logbin_2020 as L
+import time
+import networkx as nx
+from scipy.stats import chisquare
+
+
+def BAModel(N,m,t0 = None, G0 = None, q = 1):
+    """
+    Function for creating an instance of the BA Model using the networkx library, 
+    requires as inputs the total number of vertices N in the network and 
+    the value 'm' for the amount of edges attached to each new vertex. 
+    Can also have an initial number of nodes t0 which is otherwise set at 
+    its minimum value of m+1. Initial graph is coded to be a regular graph
+    with degree 'm'. Alternatively a previously created graph can be 
+    used to bypass the initial network creation step using the kwarg 'G0'.
+    """
+    if isinstance(m,int) == False:
+        raise Exception("Number of new edges created has to be an integer")
+    if isinstance(G0, nx.Graph) == True:
+        G = G0               #Option of using previously created graph
+        T = len(nx.nodes(G))
+        if G.number_of_nodes() >= N:
+            raise Exception("Initial Graph cannot be larger than final graph")
+    else:
+        if isinstance(t0, int) == True and t0 > m and t0*m%2 ==0:      #Checking user-defined t0 can be used here
+            pass          
+        else:
+            #print("t0 set to m+1 by default")      #Otherwise set t0 to its minimum value
+            t0 = m+1
+        G = nx.random_regular_graph(m,t0)      #Create initial regualr graph with degree = m and t0 nodes
+        T = t0
+    E1 = list(nx.edges(G))                    #Create list of edges
+    E = []                                      #List of Edge ends
+    for i in range(len(E1)):
+        E.extend([E1[i][0],E1[i][1]])
+    while T < N:
+        new_edges = m
+        G.add_node(T)
+        target_nodes = []
+        nrep = 'False'
+        while new_edges > 0:
+            if nrep == 'False':
+                r = ran.random()
+            if r <= q:
+                nrep = 'True'
+                R = ran.randint(0,len(E)-1)
+                n = E[R]
+            else:                
+                nrep = 'True'
+                n = ran.randint(0,nx.number_of_nodes(G)-2)
+            if n in target_nodes:
+                pass
+            else:
+                target_nodes.append(n)
+                new_edges -= 1
+                nrep = 'False'
+        G.add_edges_from(zip([T]*m,target_nodes))
+        E.extend([T]*m)
+        E.extend(target_nodes)
+        T += 1
+    return G    
+ 
+def KdistData(N,m,R,t0 = None, G0 = None, q = 1):
+    """
+    Function for Obtaining a dataset on the degree distribution of a BA
+    Model for the given parameters from R repeats. Returns the averaged
+    values as a 1D array
+    """               
+    Complete_data = []
+    for i in range(R):                
+        G = BAModel(N, m, t0 = t0, G0 = G0, q=q)
+        for (x,y) in list(nx.degree(G)):
+            Complete_data.append(y)        
+    return Complete_data
+
+def TheoDist(m,k_values):
+    """
+    Function for creating linear data to show what the theoretical distribution
+    values would be for the given k values with their value of m
+    """
+    Theo = [0]*len(k_values)
+    for i in range(len(k_values)):
+        Theo[i] = 2*m*(m+1)/k_values[i]/(k_values[i]+1)/(k_values[i]+2)
+    return Theo
+    
+def R2Test(Fit, Data):
+    """
+    Function for performing an R^2 test on a logarithmic data fit to see how well it
+    models the data
+    """
+    logfit = np.log(Fit)
+    logdata = np.log(Data)
+    Squaretots = 0
+    Squareresids = 0
+    mean = np.mean(logdata)
+    for i in range(len(logdata)):
+        Squaretots += (logdata[i]-mean)**2
+        Squareresids += (logdata[i]-logfit[i])**2
+    return (1-Squareresids/Squaretots)
+   
+def largestkdata(N,m,R, t0 = None, G0 = None, q = 1):
+    """
+    Function for obtaining a dataset on the largest expected degree of 
+    a BA Model for the given parameters from R repeats. Returns the
+    averaged value and the standard error
+    """
+    largestk = []
+    for i in range(R):
+        G = BAModel(N, m, t0 = t0, G0 = G0, q=q)
+        largestk.append(len(nx.degree_histogram(G))-1)
+    k_ave = sum(largestk)/R
+    kerr = 0
+    for i in range(R):
+        kerr += (largestk[i]-k_ave)**2
+    kerr /= R*(R-1)
+    kerr = kerr**0.5
+    return k_ave, kerr
+
+def Theok(N,m):
+    """
+    Function for creating linear data to show what the theoretical largest degree
+    would be for the given variables
+    """
+    return (-0.5+((1+4*N*m*(m+1))/4)**0.5)
+    
+def raTheoDist(m,k_values):
+    """
+    Function for creating linear data to show what the theoretical distribution
+    values would be for the given k values with their value of m for RA
+    """
+    Theo = [0]*len(k_values)
+    for i in range(len(k_values)):
+        Theo[i] = (m**(k_values[i]-m))/((1+m)**(1+k_values[i]-m))
+    return Theo   
+
+def raTheok(N,m):
+    """
+    Function for creating linear data to show what the theoretical largest degree
+    would be for the given variables for RA
+    """
+    return m-np.log(N)/(np.log(m)-np.log(m+1))
+
+def maTheoDist(m, k_values):
+    """
+    Function for creating linear data to show what the theoretical distribution
+    values would be for the given k values with their value of m for MA where 
+    q = 2/3
+    """
+    Theo = [0]*len(k_values)
+    for i in range(len(k_values)):
+        Theo[i] = 6*m*(2*m+1)*(2*m+2)/(k_values[i]+m+3)/(k_values[i]+m+2)/(k_values[i]+m+1)/(k_values[i]+m)
+    return Theo   
+
+def TestG0():
+    """
+    Function for producing a specific initial graph G0 used to test that the
+    BA model algorithm is working
+    """
+    G0 = nx.empty_graph(6)
+    edges = [(0,1),(0,2),(0,3),(0,4),(0,5),(2,3),(2,4),(2,5),(3,4)]
+    G0.add_edges_from(edges)
+    return G0
+    
