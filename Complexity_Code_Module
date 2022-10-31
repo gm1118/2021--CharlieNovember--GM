@@ -1,0 +1,297 @@
+import numpy as np
+import random as ran
+import matplotlib.pyplot as plt
+import logbin_2020 as L
+import time
+
+
+class OsloModel:
+    """
+    A Class for describing an iteration of the Oslo model with its own
+    variables to describe the system's properties such as L, h and t.
+    Has functions for driving the model and measuring its properties.
+    """
+    
+    def __init__(self, L=10, p = 0.5):
+        self._L = L           #Set system length to L
+        self._p = p
+        if self._L <= 0:
+            raise Exception("Length is negative or 0")
+        self._h = np.zeros(self._L + 1)    #Array containing site heights
+        self._z = np.zeros(self._L)    #Array for site threshold slopes
+        for i in range(L):
+            r = ran.random()
+            if r <= self._p:
+                self._z[i] = 1
+            else:
+                self._z[i] = 2
+        self._T = 0
+
+        
+        
+    def drive(self, n):
+        """
+        Function for driving the Oslo Model 'n' times returns the 
+        avalanche size 's' for the avalanches that have occured as an array
+        """
+        if n <= 0:
+            raise Exception("Number of iterations is negative or 0")
+        if isinstance(n,int) != True:
+            raise Exception("'n' is not an integer")
+        s = np.zeros(n)      # array for no. of avalanches per iteration
+        while n > 0:
+            self._h[0] += 1       #Drive the system
+            i = 0                 #Variable for checking for relaxations
+            if self._h[i] - self._h[i+1] <= self._z[i]:
+                self._T += 1
+                n -= 1            #If there is no relaxation at site 1 following drive, there will be none in this iteration
+            else:
+                s[len(s)-n] += 1             #add Avalanche
+                self._h[i] -= 1   
+                self._h[i+1] += 1
+                r = ran.random()
+                if r <= self._p:     #Create new threshold slope
+                    self._z[i] = 1
+                else:
+                    self._z[i] = 2
+                while i < self._L:  #Check entire system for avalanches
+                    if self._h[i] - self._h[i+1] <= self._z[i]:
+                        i += 1       #If no avalanche possible proceed to check next site
+                    else:
+                        s[len(s)-n] += 1
+                        self._h[i] -= 1
+                        self._h[i+1] += 1
+                        r = ran.random()
+                        if r <= self._p:
+                            self._z[i] = 1
+                        else:
+                            self._z[i] = 2
+                        if i == self._L-1:
+                            self._h[i+1] = 0   #For final site 'h' will always be 0
+                            i -= 1
+                        elif i == 0:           
+                            pass               #For initial site, there is no previous site to check, so check current site again before proceeding
+                        else:
+                            i -= 1       #First check to see if previous site has been affected by avalanche and needs to relax, then proceed forward
+                self._T += 1
+                n -= 1  #Once all possible avalanches have occured proceed to next iteration
+
+        return s         #Return total number of avalanches
+    
+    def h(self, num):
+        return self._h[num]
+    
+    def z(self, num):
+        return (self._h[num]-self._h[num+1])
+    
+    def T(self):
+        return self._T
+                                       
+    
+    def Reinit(self):
+        """
+        Function for reinitialising an Oslo Model 
+        """
+        self._h = np.zeros(self._L + 1)   
+        self._z = np.zeros(self._L)
+        for i in range(self._L):
+            r = ran.random()
+            if r <= self._p:
+                self._z[i] = 1
+            else:
+                self._z[i] = 2
+        self._T = 0  
+        
+    def hAve(self, n):
+        """
+        Function for testing the OsloModel Class along with the drive function
+        to see if it is working as intended using the test suggested in the
+        project notes, n is the no. of values used for average height value.
+        Returns the average height value at the 1st site
+        """
+        while self._T == sum(self._h):
+            self.drive(1)
+        h1 = np.zeros(n)
+        for i in range (n):          #Drive system 'n' times and record height at 1st site each time
+            self.drive(1)
+            h1[i] = self.h(0)        #Add to array
+        return (sum(h1)/n)           #Sum array and return average 
+        
+        
+        
+    def Test2(self):
+        """
+        Second Function for Testing the OsloModel Class and drive function
+        by seeing if it can recreate the 1D BTW model by setting p = 1
+        """
+        self.Reinit()
+        self._p = 1                       #Recreate 1D BTW model
+        n = int(0.5*(self._L**2+self._L))      #Drive until expected recurrent configs
+        self.drive(n)
+        print (self._h)
+        self.drive(1)
+        if self._T == sum(self._h)+1:
+            print("Only 1 grain has left the model as expected")
+        else:
+            raise Exception("Test Unsuccessful")
+        self.drive(99)
+        if self._T == sum(self._h)+100:
+            print("Test also successful following 100 drives into Recurrent Configuration")
+        else:
+            raise Exception("Test not successful when attempting 100 drives - check model variable values")
+        
+
+    def htdata(self,T):
+        """
+        Function for obatining the data to plot h vs. t for a model of size L
+        Returns an array for h, and the point where the model
+        moves from transient to recurrent configurations. End time T can be set.
+        """
+        h = np.zeros(T+1)
+        Tc = 0
+        for i in range(T):
+            h[i] = self.h(0)
+            self.drive(1)
+            if Tc == 0:
+                if self._T != sum(self._h):
+                    Tc = i
+        h[T] = self.h(0)
+        return h,Tc
+    
+    def TcAve(self,n=100):
+        """
+        Function for obtaining an average of values for Tc for a given system's parameters determined
+        from 'n' values
+        """
+        Tcs = np.zeros(n)
+        for i in range(n):
+            self.Reinit()
+            while self._T == sum(self._h):
+                self.drive(1)
+            Tcs[i] = self._T
+        return sum(Tcs)/n
+    
+    def htdataAve(self, T, n):
+        """
+        Function for obtaining an average of h vs t data from multiple realisations of
+        the same system
+        """
+        H = np.zeros(T+1)
+        for i in range(n):
+            self.Reinit()
+            h, Tc = self.htdata(T)
+            H += h
+        H /= n
+        return H
+    
+
+    def hVarAve(self, n):
+        """
+        Function for obtaining the variance for the average height
+        """
+        while self._T == sum(self._h):
+            self.drive(1)
+        h1Arr = np.zeros(n)
+        h2Arr = np.zeros(n)
+        for i in range (n):          #Drive system 'n' times and record height at 1st site each time
+            self.drive(1)
+            h2Arr[i] = (self.h(0))**2        #Add to array
+            h1Arr[i] = self.h(0)
+        h2 = sum(h2Arr)/n
+        h1 = sum(h1Arr)/n
+        hVar = h2 - h1**2
+        return hVar
+        
+    
+    def hProbdata(self, n):
+        """
+        Function for creating a dataset made up of two arrays, one for the various
+        heights for the model, and the other for the frequency of said height, hence
+        producing a model for the probability of each height
+        """
+        while self._T == sum(self._h):
+            self.drive(1)
+        hArr = np.zeros(0)
+        hFreqArr = np.zeros(0)
+        for i in range (n):          #Drive system 'n' times and record height at 1st site each time
+            repeat = False    
+            self.drive(1)
+            h = self.h(0)
+            for j in range(len(hArr)):
+                if h == hArr[j]:
+                    hFreqArr[j] += 1/n
+                    repeat = True
+                else:
+                    pass
+            if repeat != True:
+               hArr = np.append(hArr, [h])
+               hFreqArr = np.append(hFreqArr, [1/n])
+        return hArr, hFreqArr
+    
+    def zdata(self, n):
+        """
+        Function for obtaining probability data for each possible value of z from
+        the z values in this Oslo Model
+        """
+        while self._T == sum(self._h):
+            self.drive(1)
+        zArr = np.array([0,1,2])
+        zFreqArr = np.zeros(3)
+        for i in range(n):
+            self.drive(1)
+            for j in range(self._L):
+                z = self.z(j)
+                if z == 0:
+                    zFreqArr[0] += 1/(n*self._L)
+                elif z == 1:
+                    zFreqArr[1] += 1/(n*self._L)
+                else:
+                    zFreqArr[2] += 1/(n*self._L)
+        return zArr, zFreqArr
+    
+    def sdata(self, N):
+        """
+        Function for obtaining a data set of avalanche sizes for the Oslo Model
+        Returns an array conatining all of the avalanches unordered
+        """
+        while self._T == sum(self._h):
+            self.drive(1)
+        s = self.drive(1)    
+        sArr = np.array(int(s))
+        for i in range(N-1):
+            s = self.drive(1)
+            sArr = np.append(sArr, int(s))
+        return sArr
+        
+
+def InterpolatePoly(x, yin, xin):
+    """
+    Function for a lagrange-polynomial interpolation on xy data performed for
+    a specific x-point
+    """
+    np.seterr(divide='ignore', invalid='ignore')
+    if len(xin) != len(yin):
+        raise Exception("Size of data sets must be equal")
+    l = len(xin)
+
+    nom = 1
+    Intersum = 0
+    Inter = np.zeros(l)      #create array for terms in the sum
+    
+    for i in range(l):
+        nom *= (x-xin[i])      #Create variable for nominator
+        Inter[i] = yin[i]
+
+    for i in range(l):
+        prod = 1               #Variable for the product of the product terms
+        for j in range(l):
+            if i >= j:
+                pass
+            else:
+                p = (xin[i]-xin[j])
+                prod /= p
+                Inter[j] /= -p   #ensure each 'p' can be reused in a future sum where possible to reduce calculation time
+        Intersum += prod*Inter[i]*nom/(x-xin[i])   #Add term to sum by multiplying product and y-value
+
+    return Intersum
+
