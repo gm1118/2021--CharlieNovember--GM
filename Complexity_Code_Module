@@ -295,3 +295,36 @@ def InterpolatePoly(x, yin, xin):
 
     return Intersum
 
+def binFreqtobinFreqdc(binFreq, bins, ts):
+    """
+    Function to save code and make it easier
+    to transform the binFreq arrays to perform a data collapse
+    Needs the binFreq array, its respective bins array and the critcial
+    exponent \tau_s
+    """
+    l = len(binFreq)
+    binFreqdc = np.zeros(l)
+    for i in range(l):
+        binFreqdc[i] = binFreq[i]*(bins[i]**ts)
+    return binFreqdc
+
+def kthmoment(sdata, k):
+    """
+    Function for determining the kth moment of an avalanche size
+    manually if provided with data on T avalanches in array form
+    during the steady state. Returns 
+    """
+    T = len(sdata)
+    sk = 0
+    if k == 1:
+        return sum(sdata)/T
+    elif k > 1:
+        for i in range(T):
+            s = sdata[i]**k
+            if s < 0:
+                s = float(sdata[i])
+                s = s**4
+            sk += s
+        sk /= T
+        return sk
+
