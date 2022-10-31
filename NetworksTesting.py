@@ -6,165 +6,7 @@ import logbin_2020 as L
 import time
 import networkx as nx
 from scipy.stats import chisquare
-
-
-def BAModel(N,m,t0 = None, G0 = None, q = 1):
-    """
-    Function for creating an instance of the BA Model using the networkx library, 
-    requires as inputs the total number of vertices N in the network and 
-    the value 'm' for the amount of edges attached to each new vertex. 
-    Can also have an initial number of nodes t0 which is otherwise set at 
-    its minimum value of m+1. Initial graph is coded to be a regular graph
-    with degree 'm'. Alternatively a previously created graph can be 
-    used to bypass the initial network creation step using the kwarg 'G0'.
-    """
-    if isinstance(m,int) == False:
-        raise Exception("Number of new edges created has to be an integer")
-    if isinstance(G0, nx.Graph) == True:
-        G = G0               #Option of using previously created graph
-        T = len(nx.nodes(G))
-        if G.number_of_nodes() >= N:
-            raise Exception("Initial Graph cannot be larger than final graph")
-    else:
-        if isinstance(t0, int) == True and t0 > m and t0*m%2 ==0:      #Checking user-defined t0 can be used here
-            pass          
-        else:
-            #print("t0 set to m+1 by default")      #Otherwise set t0 to its minimum value
-            t0 = m+1
-        G = nx.random_regular_graph(m,t0)      #Create initial regualr graph with degree = m and t0 nodes
-        T = t0
-    E1 = list(nx.edges(G))                    #Create list of edges
-    E = []                                      #List of Edge ends
-    for i in range(len(E1)):
-        E.extend([E1[i][0],E1[i][1]])
-    while T < N:
-        new_edges = m
-        G.add_node(T)
-        target_nodes = []
-        nrep = 'False'
-        while new_edges > 0:
-            if nrep == 'False':
-                r = ran.random()
-            if r <= q:
-                nrep = 'True'
-                R = ran.randint(0,len(E)-1)
-                n = E[R]
-            else:                
-                nrep = 'True'
-                n = ran.randint(0,nx.number_of_nodes(G)-2)
-            if n in target_nodes:
-                pass
-            else:
-                target_nodes.append(n)
-                new_edges -= 1
-                nrep = 'False'
-        G.add_edges_from(zip([T]*m,target_nodes))
-        E.extend([T]*m)
-        E.extend(target_nodes)
-        T += 1
-    return G    
- 
-def KdistData(N,m,R,t0 = None, G0 = None, q = 1):
-    """
-    Function for Obtaining a dataset on the degree distribution of a BA
-    Model for the given parameters from R repeats. Returns the averaged
-    values as a 1D array
-    """               
-    Complete_data = []
-    for i in range(R):                
-        G = BAModel(N, m, t0 = t0, G0 = G0, q=q)
-        for (x,y) in list(nx.degree(G)):
-            Complete_data.append(y)        
-    return Complete_data
-
-def TheoDist(m,k_values):
-    """
-    Function for creating linear data to show what the theoretical distribution
-    values would be for the given k values with their value of m
-    """
-    Theo = [0]*len(k_values)
-    for i in range(len(k_values)):
-        Theo[i] = 2*m*(m+1)/k_values[i]/(k_values[i]+1)/(k_values[i]+2)
-    return Theo
-    
-def R2Test(Fit, Data):
-    """
-    Function for performing an R^2 test on a logarithmic data fit to see how well it
-    models the data
-    """
-    logfit = np.log(Fit)
-    logdata = np.log(Data)
-    Squaretots = 0
-    Squareresids = 0
-    mean = np.mean(logdata)
-    for i in range(len(logdata)):
-        Squaretots += (logdata[i]-mean)**2
-        Squareresids += (logdata[i]-logfit[i])**2
-    return (1-Squareresids/Squaretots)
-   
-def largestkdata(N,m,R, t0 = None, G0 = None, q = 1):
-    """
-    Function for obtaining a dataset on the largest expected degree of 
-    a BA Model for the given parameters from R repeats. Returns the
-    averaged value and the standard error
-    """
-    largestk = []
-    for i in range(R):
-        G = BAModel(N, m, t0 = t0, G0 = G0, q=q)
-        largestk.append(len(nx.degree_histogram(G))-1)
-    k_ave = sum(largestk)/R
-    kerr = 0
-    for i in range(R):
-        kerr += (largestk[i]-k_ave)**2
-    kerr /= R*(R-1)
-    kerr = kerr**0.5
-    return k_ave, kerr
-
-def Theok(N,m):
-    """
-    Function for creating linear data to show what the theoretical largest degree
-    would be for the given variables
-    """
-    return (-0.5+((1+4*N*m*(m+1))/4)**0.5)
-    
-def raTheoDist(m,k_values):
-    """
-    Function for creating linear data to show what the theoretical distribution
-    values would be for the given k values with their value of m for RA
-    """
-    Theo = [0]*len(k_values)
-    for i in range(len(k_values)):
-        Theo[i] = (m**(k_values[i]-m))/((1+m)**(1+k_values[i]-m))
-    return Theo   
-
-def raTheok(N,m):
-    """
-    Function for creating linear data to show what the theoretical largest degree
-    would be for the given variables for RA
-    """
-    return m-np.log(N)/(np.log(m)-np.log(m+1))
-
-def maTheoDist(m, k_values):
-    """
-    Function for creating linear data to show what the theoretical distribution
-    values would be for the given k values with their value of m for MA where 
-    q = 2/3
-    """
-    Theo = [0]*len(k_values)
-    for i in range(len(k_values)):
-        Theo[i] = 6*m*(2*m+1)*(2*m+2)/(k_values[i]+m+3)/(k_values[i]+m+2)/(k_values[i]+m+1)/(k_values[i]+m)
-    return Theo   
-
-def TestG0():
-    """
-    Function for producing a specific initial graph G0 used to test that the
-    BA model algorithm is working
-    """
-    G0 = nx.empty_graph(6)
-    edges = [(0,1),(0,2),(0,3),(0,4),(0,5),(2,3),(2,4),(2,5),(3,4)]
-    G0.add_edges_from(edges)
-    return G0
-    
+import Networks_Code_Module as N
 
 #%%
 #PA Test
@@ -172,21 +14,21 @@ def TestG0():
 Freq = np.array([0,0,0,0,0,0])
 Exp = np.array([13/54,5/54,11/54,9/54,9/54,7/54])
 for i in range(10**6):
-    G0 = TestG0()    
-    G1 = BAModel(7, 1, G0 = G0, q = 2/3)
+    G0 = N.TestG0()    
+    G1 = N.BAModel(7, 1, G0 = G0, q = 2/3)
     Freq[(list(nx.edges(G0,nbunch = 6))[0][1])]+=1
 Prob = Freq/(10**6)
 print(chisquare(Prob,Exp))
 #%%
 #Figure 2
-G0 = TestG0()
+G0 = N.TestG0()
 plt.subplot(121)
 nx.draw(G0, with_labels=True, font_weight='bold')
 plt.show()
 #%%
 #Growth Test
 for i in range(10**6):
-    G1 = BAModel(10**6,3)
+    G1 = N.BAModel(10**6,3)
     if nx.number_of_nodes(G1) != 10**6:
         print(i)
         raise Exception('Fail')
@@ -196,24 +38,24 @@ print('Success')
 #%%        
 
 #start = time.time()
-m1data = KdistData(10000, 1, 3200)       
+m1data = N.KdistData(10000, 1, 3200)       
 m1bins, m1freq = L.logbin(m1data, scale = 1.1, zeros = False)
-m1theo = TheoDist(1, m1bins)
-m3data = KdistData(10000, 3, 1600)       
+m1theo = N.TheoDist(1, m1bins)
+m3data = N.KdistData(10000, 3, 1600)       
 m3bins, m3freq = L.logbin(m3data, scale = 1.1, zeros = False)
-m3theo = TheoDist(3, m3bins)
+m3theo = N.TheoDist(3, m3bins)
 m9data = KdistData(10000, 9, 800)       
 m9bins, m9freq = L.logbin(m9data, scale = 1.1, zeros = False)
-m9theo = TheoDist(9, m9bins)
-m27data = KdistData(10000, 27, 400)       
+m9theo = N.TheoDist(9, m9bins)
+m27data = N.KdistData(10000, 27, 400)       
 m27bins, m27freq = L.logbin(m27data, scale = 1.1, zeros = False)
-m27theo = TheoDist(27, m27bins)
-m81data = KdistData(10000, 81, 200)       
+m27theo = N.TheoDist(27, m27bins)
+m81data = N.KdistData(10000, 81, 200)       
 m81bins, m81freq = L.logbin(m81data, scale = 1.1, zeros = False)
-m81theo = TheoDist(81, m81bins)
-m243data = KdistData(10000, 243, 100)       
+m81theo = N.TheoDist(81, m81bins)
+m243data = N.KdistData(10000, 243, 100)       
 m243bins, m243freq = L.logbin(m243data, scale = 1.1, zeros = False)
-m243theo = TheoDist(243, m243bins)
+m243theo = N.TheoDist(243, m243bins)
 #end = time.time()
 #runtime = end-start
 #print(runtime)
@@ -251,20 +93,20 @@ ax2.set_xscale('log')
 ax2.set_yscale('log')
 plt.show   
 #%%
-print(R2Test(m1theo, m1freq))
-print(R2Test(m3theo, m3freq))
-print(R2Test(m9theo, m9freq))
-print(R2Test(m27theo, m27freq))
-print(R2Test(m81theo, m81freq))
-print(R2Test(m243theo, m243freq))
+print(N.R2Test(m1theo, m1freq))
+print(N.R2Test(m3theo, m3freq))
+print(N.R2Test(m9theo, m9freq))
+print(N.R2Test(m27theo, m27freq))
+print(N.R2Test(m81theo, m81freq))
+print(N.R2Test(m243theo, m243freq))
 #%%
 #Third Figure - K1 vs. Theory
 #start = time.time()
-N2data, N2err = largestkdata(10**2, 3, 10**6)
-N3data, N3err = largestkdata(10**3, 3, 10**5)
-N4data, N4err = largestkdata(10**4, 3, 10**4)
-N5data, N5err = largestkdata(10**5, 3, 10**3)
-N6data, N6err = largestkdata(10**6, 3, 10**2)
+N2data, N2err = N.largestkdata(10**2, 3, 10**6)
+N3data, N3err = N.largestkdata(10**3, 3, 10**5)
+N4data, N4err = N.largestkdata(10**4, 3, 10**4)
+N5data, N5err = N.largestkdata(10**5, 3, 10**3)
+N6data, N6err = N.largestkdata(10**6, 3, 10**2)
 #end = time.time()
 #runtime = end - start
 #print(runtime)
@@ -286,12 +128,12 @@ plt.show
 
 #%%
 #start = time.time()
-m1kdata, m1err = largestkdata(10**4, 1, 3200)
-m3kdata, m3err = largestkdata(10**4, 3, 1600)
-m9kdata, m9err = largestkdata(10**4, 9, 800)
-m27kdata, m27err = largestkdata(10**4, 27, 400)
-m81kdata, m81err = largestkdata(10**4, 81, 200)
-m243kdata, m243err = largestkdata(10**4, 243, 100)
+m1kdata, m1err = N.largestkdata(10**4, 1, 3200)
+m3kdata, m3err = N.largestkdata(10**4, 3, 1600)
+m9kdata, m9err = N.largestkdata(10**4, 9, 800)
+m27kdata, m27err = N.largestkdata(10**4, 27, 400)
+m81kdata, m81err = N.largestkdata(10**4, 81, 200)
+m243kdata, m243err = N.largestkdata(10**4, 243, 100)
 #end = time.time()
 #runtime = end - start
 #print(runtime)
@@ -323,21 +165,21 @@ ax4.set_xscale('log')
 ax4.set_yscale('log')
 plt.show   
 #%%
-N2distdata = KdistData(10**2, 3, 10**5)       
+N2distdata = N.KdistData(10**2, 3, 10**5)       
 N2bins, N2freq = L.logbin(N2distdata, scale = 1.1, zeros = False)
-N2theo = TheoDist(3, N2bins)
-N3distdata = KdistData(10**3, 3, 10**4)       
+N2theo = N.TheoDist(3, N2bins)
+N3distdata = N.KdistData(10**3, 3, 10**4)       
 N3bins, N3freq = L.logbin(N3distdata, scale = 1.1, zeros = False)
-N3theo = TheoDist(3, N3bins)
-N4distdata = KdistData(10**4, 3, 10**3)       
+N3theo = N.TheoDist(3, N3bins)
+N4distdata = N.KdistData(10**4, 3, 10**3)       
 N4bins, N4freq = L.logbin(N4distdata, scale = 1.1, zeros = False)
-N4theo = TheoDist(3, N4bins)
-N5distdata = KdistData(10**5, 3, 10**2)       
+N4theo = N.TheoDist(3, N4bins)
+N5distdata = N.KdistData(10**5, 3, 10**2)       
 N5bins, N5freq = L.logbin(N5distdata, scale = 1.1, zeros = False)
-N5theo = TheoDist(3, N5bins)
-N6distdata = KdistData(10**6, 3, 10**1)       
+N5theo = N.TheoDist(3, N5bins)
+N6distdata = N.KdistData(10**6, 3, 10**1)       
 N6bins, N6freq = L.logbin(N6distdata, scale = 1.1, zeros = False)
-N6theo = TheoDist(3, N6bins)
+N6theo = N.TheoDist(3, N6bins)
 
 #%%
 N2ploty = [x/y for x,y in zip(N2freq,N2theo)]
@@ -372,24 +214,24 @@ plt.show
 #%%
 #Figure 5 - RA K-Distributions
 #start = time.time()
-ram1data = KdistData(10000, 1, 3200, q = 0)       
+ram1data = N.KdistData(10000, 1, 3200, q = 0)       
 ram1bins, ram1freq = L.logbin(ram1data, scale = 1.1, zeros = False)
-ram1theo = raTheoDist(1, ram1bins)
-ram3data = KdistData(10000, 3, 1600, q = 0)       
+ram1theo = N.raTheoDist(1, ram1bins)
+ram3data = N.KdistData(10000, 3, 1600, q = 0)       
 ram3bins, ram3freq = L.logbin(ram3data, scale = 1.1, zeros = False)
-ram3theo = raTheoDist(3, ram3bins)
-ram9data = KdistData(10000, 9, 800, q = 0)       
+ram3theo = N.raTheoDist(3, ram3bins)
+ram9data = N.KdistData(10000, 9, 800, q = 0)       
 ram9bins, ram9freq = L.logbin(ram9data, scale = 1.1, zeros = False)
-ram9theo = raTheoDist(9, ram9bins)
-ram27data = KdistData(10000, 27, 400, q = 0)       
+ram9theo = N.raTheoDist(9, ram9bins)
+ram27data = N.KdistData(10000, 27, 400, q = 0)       
 ram27bins, ram27freq = L.logbin(ram27data, scale = 1.1, zeros = False)
-ram27theo = raTheoDist(27, ram27bins)
-ram81data = KdistData(10000, 81, 200, q = 0)       
+ram27theo = N.raTheoDist(27, ram27bins)
+ram81data = N.KdistData(10000, 81, 200, q = 0)       
 ram81bins, ram81freq = L.logbin(ram81data, scale = 1.1, zeros = False)
-#ram81theo = raTheoDist(81, ram81bins)   Cause Error - Cannot be calculated
-ram243data = KdistData(10000, 243, 100, q = 0)       
+#ram81theo = N.raTheoDist(81, ram81bins)   Cause Error - Cannot be calculated
+ram243data = N.KdistData(10000, 243, 100, q = 0)       
 ram243bins, ram243freq = L.logbin(ram243data, scale = 1.1, zeros = False)
-#ram243theo = raTheoDist(243, ram243bins)  #Cause Error - Cannot be calculated
+#ram243theo = N.raTheoDist(243, ram243bins)  #Cause Error - Cannot be calculated
 #end = time.time()
 #runtime = end - start
 #print(runtime)
@@ -417,11 +259,11 @@ plt.show
 #%%
 # Figure 6 - RA K1 values
 start = time.time()
-raN2data, raN2err = largestkdata(10**2, 3, 10**6, q = 0)
-raN3data, raN3err = largestkdata(10**3, 3, 10**5, q = 0)
-raN4data, raN4err = largestkdata(10**4, 3, 10**4, q = 0)
-raN5data, raN5err = largestkdata(10**5, 3, 10**3, q = 0)
-raN6data, raN6err = largestkdata(10**6, 3, 10**2, q = 0)
+raN2data, raN2err = N.largestkdata(10**2, 3, 10**6, q = 0)
+raN3data, raN3err = N.largestkdata(10**3, 3, 10**5, q = 0)
+raN4data, raN4err = N.largestkdata(10**4, 3, 10**4, q = 0)
+raN5data, raN5err = N.largestkdata(10**5, 3, 10**3, q = 0)
+raN6data, raN6err = N.largestkdata(10**6, 3, 10**2, q = 0)
 #end = time.time()
 #runtime - end-start
 #print(runtime)
@@ -432,7 +274,7 @@ Ns = np.array([10**2,10**3,10**4,10**5,10**6])
 #rafiterr = rafitdata[0][0]
 Ratheo_x = np.arange(1.8,6.2,0.1)
 ratheo_x = [10**x for x in Ratheo_x]
-ratheo_y = [raTheok(x,3) for x in ratheo_x ]
+ratheo_y = [N.raTheok(x,3) for x in ratheo_x ]
 #%%
 f,ax6 = plt.subplots()
 ax6.errorbar(Ns, np.array([raN2data, raN3data, raN4data, raN5data, raN6data]),yerr = np.array([raN2err,raN3err,raN4err,raN5err,raN6err]), fmt = 'kx', label = 'Numerical Data')
@@ -446,24 +288,24 @@ plt.show
 #%%
 # Figure 7 - MA - K Distribution
 #start = time.time()
-mam1data = KdistData(10000, 1, 3200, q = 2/3)       
+mam1data = N.KdistData(10000, 1, 3200, q = 2/3)       
 mam1bins, mam1freq = L.logbin(mam1data, scale = 1.1, zeros = False)
-mam1theo = maTheoDist(1, mam1bins)
-mam3data = KdistData(10000, 3, 1600, q = 2/3)       
+mam1theo = N.maTheoDist(1, mam1bins)
+mam3data = N.KdistData(10000, 3, 1600, q = 2/3)       
 mam3bins, mam3freq = L.logbin(mam3data, scale = 1.1, zeros = False)
-mam3theo = maTheoDist(3, mam3bins)
-mam9data = KdistData(10000, 9, 800, q = 2/3)       
+mam3theo = N.maTheoDist(3, mam3bins)
+mam9data = N.KdistData(10000, 9, 800, q = 2/3)       
 mam9bins, mam9freq = L.logbin(mam9data, scale = 1.1, zeros = False)
-mam9theo = maTheoDist(9, mam9bins)
-mam27data = KdistData(10000, 27, 400, q = 2/3)       
+mam9theo = N.maTheoDist(9, mam9bins)
+mam27data = N.KdistData(10000, 27, 400, q = 2/3)       
 mam27bins, mam27freq = L.logbin(mam27data, scale = 1.1, zeros = False)
-mam27theo = maTheoDist(27, mam27bins)
-mam81data = KdistData(10000, 81, 200, q = 2/3)       
+mam27theo = N.maTheoDist(27, mam27bins)
+mam81data = N.KdistData(10000, 81, 200, q = 2/3)       
 mam81bins, mam81freq = L.logbin(mam81data, scale = 1.1, zeros = False)
-mam81theo = maTheoDist(81, mam81bins)   #Calculate Manually
-mam243data = KdistData(10000, 243, 100, q = 2/3)       
+mam81theo = N.maTheoDist(81, mam81bins)   #Calculate Manually
+mam243data = N.KdistData(10000, 243, 100, q = 2/3)       
 mam243bins, mam243freq = L.logbin(mam243data, scale = 1.1, zeros = False)
-mam243theo = maTheoDist(243, mam243bins)  #Calculate manually
+mam243theo = N.maTheoDist(243, mam243bins)  #Calculate manually
 #end = time.time()
 #runtime = end-start
 #print(runtime)
@@ -490,11 +332,11 @@ plt.show
 #%%
 # Figure 8 - MA K1 values
 #start = time.time()
-maN2data, maN2err = largestkdata(10**2, 3, 10**6, q = 2/3)
-maN3data, maN3err = largestkdata(10**3, 3, 10**5, q = 2/3)
-maN4data, maN4err = largestkdata(10**4, 3, 10**4, q = 2/3)
-maN5data, maN5err = largestkdata(10**5, 3, 10**3, q = 2/3)
-maN6data, maN6err = largestkdata(10**6, 3, 10**2, q = 2/3)
+maN2data, maN2err = N.largestkdata(10**2, 3, 10**6, q = 2/3)
+maN3data, maN3err = N.largestkdata(10**3, 3, 10**5, q = 2/3)
+maN4data, maN4err = N.largestkdata(10**4, 3, 10**4, q = 2/3)
+maN5data, maN5err = N.largestkdata(10**5, 3, 10**3, q = 2/3)
+maN6data, maN6err = N.largestkdata(10**6, 3, 10**2, q = 2/3)
 #end = time.time()
 #runtime = end-start
 #print(runtime)
@@ -505,7 +347,7 @@ mapoly1d_fn = np.poly1d(mafit)
 mafiterr = mafitdata[0][0]
 #Ratheo_x = np.arange(1.8,6.2,0.1)
 #ratheo_x = [10**x for x in Ratheo_x]
-#ratheo_y = [raTheok(x,3) for x in ratheo_x ]
+#ratheo_y = [N.raTheok(x,3) for x in ratheo_x ]
 #%%
 f,ax8 = plt.subplots()
 ax8.errorbar(Ns, np.array([maN2data, maN3data, maN4data, maN5data, maN6data]),yerr = np.array([maN2err,maN3err,maN4err,maN5err,maN6err]), fmt = 'kx', label = 'Numerical Data')
